@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
-import { chmod, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
 import {
   opencodeRuntime,
+  resolveOpenCodeAgentArgs,
   resolveOpenCodePermissionOptions,
 } from './opencode-runtime.provider.js';
 import { OpenCodeSessionsProvider } from './opencode-sessions.provider.js';
@@ -170,6 +171,88 @@ test('resolveOpenCodePermissionOptions maps UI permission modes onto OpenCode co
   // default and anything unknown leave the user's own opencode config in charge.
   assert.deepEqual(resolveOpenCodePermissionOptions('default'), { args: [], env: {} });
   assert.deepEqual(resolveOpenCodePermissionOptions(undefined), { args: [], env: {} });
+});
+
+test('resolveOpenCodeAgentArgs validates names against the install', async () => {
+  // build is the default agent and needs no flag; anything malformed or
+  // unknown resolves to no flag so the run keeps the default agent.
+  assert.deepEqual(await resolveOpenCodeAgentArgs(undefined, os.tmpdir()), []);
+  assert.deepEqual(await resolveOpenCodeAgentArgs('build', os.tmpdir()), []);
+  assert.deepEqual(await resolveOpenCodeAgentArgs('../evil', os.tmpdir()), []);
+  assert.deepEqual(await resolveOpenCodeAgentArgs('no such agent', os.tmpdir()), []);
+  assert.deepEqual(await resolveOpenCodeAgentArgs('missing-agent', os.tmpdir()), []);
+  // plan is built in, so it needs no agent file on disk.
+  assert.deepEqual(await resolveOpenCodeAgentArgs('plan', os.tmpdir()), ['--agent', 'plan']);
+});
+
+test('spawnOpenCode passes a custom agent to the CLI', async () => {
+  const tempRoot = await mkdtemp(path.join(os.tmpdir(), 'opencode-cli-agent-'));
+  const homeRoot = await mkdtemp(path.join(os.tmpdir(), 'opencode-cli-agent-home-'));
+  const originalHomedir = os.homedir;
+  (os).homedir = () => homeRoot;
+  const pathKey = findEnvKey('PATH');
+  const previousPath = process.env[pathKey];
+  const previousArgsCapture = process.env.OPENCODE_ARGS_CAPTURE;
+  const writer = {
+    userId: null,
+    sessionId: null,
+    send() {},
+    setSessionId(sessionId) {
+      this.sessionId = sessionId;
+    },
+  };
+
+  try {
+    const agentsDir = path.join(homeRoot, '.config', 'opencode', 'agents');
+    await mkdir(agentsDir, { recursive: true });
+    await writeFile(
+      path.join(agentsDir, 'crew-builder.md'),
+      '---\nname: crew-builder\ndescription: Builds.\n---\n\n',
+      'utf8',
+    );
+
+    await createFakeOpenCodeExecutable(tempRoot);
+    process.env[pathKey] = `${tempRoot}${path.delimiter}${previousPath || ''}`;
+
+    const argsCapturePath = path.join(tempRoot, 'opencode-args-agent.json');
+    process.env.OPENCODE_ARGS_CAPTURE = argsCapturePath;
+    await opencodeRuntime.run('Hi', { cwd: tempRoot, agent: 'crew-builder' }, writer, runtimeContext);
+    const capture = JSON.parse(await readFile(argsCapturePath, 'utf8'));
+    assert.ok(capture.args.includes('--agent'));
+    assert.equal(capture.args[capture.args.indexOf('--agent') + 1], 'crew-builder');
+
+    // A named agent wins the --agent flag over plan mode.
+    const planCapturePath = path.join(tempRoot, 'opencode-args-agent-plan.json');
+    process.env.OPENCODE_ARGS_CAPTURE = planCapturePath;
+    await opencodeRuntime.run(
+      'Hi',
+      { cwd: tempRoot, agent: 'crew-builder', permissionMode: 'plan' },
+      writer,
+      runtimeContext,
+    );
+    const planCapture = JSON.parse(await readFile(planCapturePath, 'utf8'));
+    assert.equal(
+      planCapture.args.filter((arg) => arg === '--agent').length,
+      1,
+    );
+    assert.equal(planCapture.args[planCapture.args.indexOf('--agent') + 1], 'crew-builder');
+  } finally {
+    (os).homedir = originalHomedir;
+    if (previousPath === undefined) {
+      delete process.env[pathKey];
+    } else {
+      process.env[pathKey] = previousPath;
+    }
+
+    if (previousArgsCapture === undefined) {
+      delete process.env.OPENCODE_ARGS_CAPTURE;
+    } else {
+      process.env.OPENCODE_ARGS_CAPTURE = previousArgsCapture;
+    }
+
+    await rm(tempRoot, { recursive: true, force: true });
+    await rm(homeRoot, { recursive: true, force: true });
+  }
 });
 
 test('spawnOpenCode passes permission mode flags and env to the CLI', async () => {

@@ -1,5 +1,6 @@
 import express, { type Request, type Response } from 'express';
 
+import { providerAgentsService } from '@/modules/providers/services/provider-agents.service.js';
 import { providerAuthService } from '@/modules/providers/services/provider-auth.service.js';
 import { providerCapabilitiesService } from '@/modules/providers/services/provider-capabilities.service.js';
 import { providerMcpService } from '@/modules/providers/services/mcp.service.js';
@@ -632,6 +633,17 @@ router.delete(
       directoryName: readPathParam(req.params.directoryName, 'directoryName'),
     });
     res.json(createApiSuccessResponse(result));
+  }),
+);
+
+// ----------------- Agents routes -----------------
+router.get(
+  '/:provider/agents',
+  asyncHandler(async (req: Request, res: Response) => {
+    const provider = parseProvider(req.params.provider);
+    const workspacePath = readOptionalQueryString(req.query.workspacePath);
+    const agents = await providerAgentsService.listProviderAgents(provider, { workspacePath });
+    res.json(createApiSuccessResponse({ provider, agents }));
   }),
 );
 

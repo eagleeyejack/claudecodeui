@@ -69,7 +69,7 @@ test('OpenCode exposes only the curated predefined catalog', async () => {
   const providerIds = new Set(
     OPENCODE_PREDEFINED_MODELS.OPTIONS.map((option) => option.value.split('/')[0]),
   );
-  assert.deepEqual([...providerIds].sort(), ['anthropic', 'opencode', 'opencode-go', 'openai'].sort());
+  assert.deepEqual([...providerIds].sort(), ['anthropic', 'opencode', 'opencode-go', 'openai', 'openrouter'].sort());
   assert.equal(
     OPENCODE_PREDEFINED_MODELS.OPTIONS.every((option) => /^[a-z0-9-]+\/.+/.test(option.value)),
     true,
@@ -87,6 +87,19 @@ test('OpenCode exposes only the curated predefined catalog', async () => {
   );
   assert.ok(
     OPENCODE_PREDEFINED_MODELS.OPTIONS.some((option) => option.value === 'openai/gpt-5.6'),
+  );
+  // OpenRouter models come from real sessions on the install: a connected
+  // `openrouter` auth entry must surface something runnable, not an empty list.
+  const openRouterOptions = OPENCODE_PREDEFINED_MODELS.OPTIONS.filter(
+    (option) => option.value.startsWith('openrouter/'),
+  );
+  assert.ok(openRouterOptions.length > 0);
+  assert.ok(openRouterOptions.every((option) => option.description === 'OpenRouter'));
+  assert.ok(
+    openRouterOptions.some((option) => option.value === 'openrouter/z-ai/glm-5.3-flash'),
+  );
+  assert.ok(
+    openRouterOptions.some((option) => option.value === 'openrouter/qwen/qwen3.8-flash'),
   );
   // The Go gateway carries its own provider id, so its models must be curated
   // too - a Go subscriber otherwise authenticates while the picker offers
@@ -165,6 +178,21 @@ test('OpenCode offers only models the install can route to', async () => {
 
       assert.deepEqual([...providerIds].sort(), ['opencode', 'openai'].sort());
       assert.equal(catalog.DEFAULT, OPENCODE_PREDEFINED_MODELS.DEFAULT);
+    },
+  );
+
+  // An OpenRouter-only login resolves to the OpenRouter options instead of an
+  // empty picker.
+  await withOpenCodeHome(
+    (homeDir) => writeOpenCodeAuth(homeDir, { openrouter: { type: 'api', key: 'test' } }),
+    async (adapter) => {
+      const catalog = await adapter.getSupportedModels();
+      const providerIds = new Set(catalog.OPTIONS.map((option) => option.value.split('/')[0]));
+
+      assert.deepEqual([...providerIds], ['openrouter']);
+      assert.ok(catalog.OPTIONS.length > 0);
+      assert.equal(catalog.DEFAULT.startsWith('openrouter/'), true);
+      assert.ok(catalog.OPTIONS.some((option) => option.value === catalog.DEFAULT));
     },
   );
 

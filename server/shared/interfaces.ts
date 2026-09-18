@@ -5,6 +5,8 @@ import type {
   LLMProvider,
   McpScope,
   NormalizedMessage,
+  ProviderAgent,
+  ProviderAgentListOptions,
   ProviderSkill,
   ProviderSkillListOptions,
   ProviderAuthStatus,
@@ -53,6 +55,12 @@ export interface IProvider {
   readonly skills: IProviderSkills;
   readonly sessions: IProviderSessions;
   readonly sessionSynchronizer: IProviderSessionSynchronizer;
+  /**
+   * Custom agents. Present only for providers with user-defined agents
+   * (OpenCode today); its absence is what makes "custom agents" unavailable
+   * and makes agent listings resolve to an empty list.
+   */
+  readonly agents?: IProviderAgents;
   /**
    * Transcript branching. Present only for providers that can materialise a
    * prefix of one conversation as an independent, resumable provider session;
@@ -154,6 +162,23 @@ export interface IProviderSkills {
   removeSkill(
     input: ProviderSkillRemoveInput,
   ): Promise<{ removed: boolean; provider: LLMProvider; directoryName: string }>;
+}
+
+// ---------------------------
+//----------------- PROVIDER AGENTS INTERFACE ------------
+/**
+ * Custom-agent contract for providers with user-defined agents.
+ *
+ * Implementations discover provider-native agent markdown locations and return
+ * normalized agent records with the exact names the provider CLI expects.
+ * Agents are read-only: users manage the markdown files directly, so there is
+ * no add/remove surface.
+ */
+export interface IProviderAgents {
+  /**
+   * Lists custom agents visible to this provider for the optional workspace.
+   */
+  listAgents(options?: ProviderAgentListOptions): Promise<ProviderAgent[]>;
 }
 
 // ---------------------------

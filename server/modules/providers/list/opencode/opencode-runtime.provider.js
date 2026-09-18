@@ -11,6 +11,8 @@ import {
 import { notifyRunFailed, notifyRunStopped } from '@/modules/notifications/index.js';
 import { createCompleteMessage, createNormalizedMessage, flattenPromptForWindowsShell, getOpenCodeDatabasePath, stripAnsiSequences } from '@/shared/utils.js';
 
+import { listOpenCodeAgentNames } from './opencode-agents.provider.js';
+
 // cross-spawn resolves .cmd shims/PATHEXT on Windows and delegates to
 // child_process.spawn everywhere else.
 const spawnFunction = crossSpawn;
@@ -45,6 +47,36 @@ export function resolveOpenCodePermissionOptions(permissionMode) {
     default:
       return { args: [], env: {} };
   }
+}
+
+/**
+ * Resolves the `--agent` flag for a client-requested agent name.
+ *
+ * `build` is the default agent and needs no flag; anything else has to exist
+ * on this install (built-in or discovered custom agent) or the CLI would fail
+ * the whole run with an invalid-agent error. Unknown or malformed names
+ * resolve to no flag so the run keeps the default agent.
+ *
+ * Exported for tests only.
+ */
+export async function resolveOpenCodeAgentArgs(agent, workspacePath) {
+  if (typeof agent !== 'string') {
+    return [];
+  }
+  const name = agent.trim();
+  if (!name || name === 'build') {
+    return [];
+  }
+  let available;
+  try {
+    available = await listOpenCodeAgentNames(workspacePath);
+  } catch {
+    return [];
+  }
+  if (!available.includes(name)) {
+    return [];
+  }
+  return ['--agent', name];
 }
 
 function resolveOpenCodeEffort(model, effort, modelsDefinition) {
@@ -131,6 +163,7 @@ async function spawnOpenCode(command, options = {}, ws, context) {
       cwd,
       model,
       effort,
+      agent,
       sessionSummary,
       images,
       files,
@@ -271,7 +304,13 @@ async function spawnOpenCode(command, options = {}, ws, context) {
         args.push('--variant', resolvedEffort);
       }
       const permissionOptions = resolveOpenCodePermissionOptions(permissionMode);
-      args.push(...permissionOptions.args);
+      const agentArgs = await resolveOpenCodeAgentArgs(agent, workingDir);
+      // A named agent owns the --agent flag; plan mode's --agent yields to it
+      // while its other levers (none today) would still apply.
+      const permissionArgs = agentArgs.length > 0 && permissionMode === 'plan'
+        ? []
+        : permissionOptions.args;
+      args.push(...agentArgs, ...permissionArgs);
       const hasAttachments =
         normalizeAttachmentDescriptors(images).length > 0
         || normalizeAttachmentDescriptors(files).length > 0;

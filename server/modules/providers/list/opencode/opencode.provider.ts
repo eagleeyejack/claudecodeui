@@ -1,3 +1,4 @@
+import { OpenCodeAgentsProvider } from '@/modules/providers/list/opencode/opencode-agents.provider.js';
 import { OpenCodeProviderAuth } from '@/modules/providers/list/opencode/opencode-auth.provider.js';
 import { OpenCodeProviderModels } from '@/modules/providers/list/opencode/opencode-models.provider.js';
 import { opencodeRuntime } from '@/modules/providers/list/opencode/opencode-runtime.provider.js';
@@ -23,6 +24,7 @@ export class OpenCodeProvider extends AbstractProvider {
   readonly skills: IProviderSkills = new OpenCodeSkillsProvider();
   readonly sessions: IProviderSessions = new OpenCodeSessionsProvider();
   readonly sessionSynchronizer: IProviderSessionSynchronizer = new OpenCodeSessionSynchronizer();
+  readonly agents = new OpenCodeAgentsProvider();
 
   constructor() {
     super('opencode');

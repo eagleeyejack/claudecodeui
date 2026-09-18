@@ -22,8 +22,10 @@ import {
  *
  * OpenCode routes by `<providerID>/<modelID>`, so this list mirrors the
  * providers `opencode models --verbose` reports: the OpenCode Zen gateway, the
- * OpenCode Go subscription gateway, and the Anthropic and OpenAI providers
- * OpenCode can address directly with the user's own credentials.
+ * OpenCode Go subscription gateway, the Anthropic and OpenAI providers
+ * OpenCode can address directly with the user's own credentials, and the
+ * OpenRouter models seen in real sessions on this install. A connected
+ * provider with no curated options would otherwise offer an empty picker.
  */
 export const OPENCODE_PREDEFINED_MODELS: ProviderModelsDefinition = {
   OPTIONS: [
@@ -289,6 +291,22 @@ export const OPENCODE_PREDEFINED_MODELS: ProviderModelsDefinition = {
     { value: 'openai/gpt-5.4-mini', label: 'GPT-5.4 mini', description: 'OpenAI' },
     { value: 'openai/gpt-5.4-mini-fast', label: 'GPT-5.4 mini Fast', description: 'OpenAI' },
     { value: 'openai/gpt-5.3-codex-spark', label: 'GPT-5.3 Codex Spark', description: 'OpenAI' },
+    {
+      value: 'openrouter/z-ai/glm-5.3-flash',
+      label: 'GLM 5.3 Flash',
+      description: 'OpenRouter',
+      effort: {
+        values: [{ value: 'low' }, { value: 'high' }, { value: 'max' }],
+      },
+    },
+    {
+      value: 'openrouter/qwen/qwen3.8-flash',
+      label: 'Qwen3.8 Flash',
+      description: 'OpenRouter',
+      effort: {
+        values: [{ value: 'low' }, { value: 'high' }, { value: 'max' }],
+      },
+    },
   ],
   DEFAULT: 'opencode/gpt-5.6-terra',
 };

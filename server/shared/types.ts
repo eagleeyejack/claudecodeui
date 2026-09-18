@@ -612,6 +612,34 @@ export type ProviderSkillSource = {
   pluginId?: string;
 };
 
+/**
+ * Normalized custom-agent record returned by provider agent adapters.
+ *
+ * Custom agents are `<name>.md` markdown files (with `description` front
+ * matter) discovered in the user's agent folders and the session project's
+ * agent folders. `name` is the exact value the `opencode run --agent` flag
+ * expects; `sourcePath` identifies which file produced the record when names
+ * overlap across scopes.
+ */
+export type ProviderAgent = {
+  provider: LLMProvider;
+  name: string;
+  description: string;
+  scope: ProviderSkillScope;
+  sourcePath: string;
+};
+
+/**
+ * Shared input accepted by provider agent listing operations.
+ *
+ * Routes pass `workspacePath` when a caller wants project agents for a
+ * specific folder. Providers fall back to the backend process cwd when this
+ * option is omitted.
+ */
+export type ProviderAgentListOptions = {
+  workspacePath?: string;
+};
+
 // ---------------------------
 //----------------- SHARED ERROR TYPES ------------
 /**
